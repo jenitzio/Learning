@@ -1,0 +1,2479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔫 NEON BLASTER - Survive the Horde!</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap');
+
+  body {
+    overflow: hidden;
+    background: #0a0a1a;
+    font-family: 'Orbitron', sans-serif;
+    cursor: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  canvas { display: block; }
+
+  /* CUSTOM CURSOR */
+  #crosshair {
+    position: fixed;
+    width: 40px; height: 40px;
+    pointer-events: none;
+    z-index: 10000;
+    transform: translate(-50%, -50%);
+  }
+  #crosshair::before, #crosshair::after {
+    content: '';
+    position: absolute;
+    background: #ff0040;
+    box-shadow: 0 0 8px #ff0040, 0 0 15px #ff004080;
+  }
+  #crosshair::before {
+    width: 2px; height: 100%;
+    left: 50%; transform: translateX(-50%);
+  }
+  #crosshair::after {
+    width: 100%; height: 2px;
+    top: 50%; transform: translateY(-50%);
+  }
+  #crosshair-dot {
+    position: absolute;
+    width: 6px; height: 6px;
+    background: #ff0040;
+    border-radius: 50%;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 10px #ff0040, 0 0 20px #ff0040;
+  }
+
+  /* HUD */
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: 15px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    z-index: 100;
+    pointer-events: none;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%);
+  }
+  .hud-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .hud-label {
+    font-size: 10px;
+    color: #888;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+  .hud-value {
+    font-size: 22px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 10px currentColor;
+  }
+  .hud-value.score { color: #00ffcc; }
+  .hud-value.wave { color: #ff6600; }
+  .hud-value.combo { color: #ff00ff; }
+
+  /* HEALTH BAR */
+  #health-container {
+    position: fixed;
+    bottom: 20px; left: 50%;
+    transform: translateX(-50%);
+    width: 300px; height: 20px;
+    background: rgba(0,0,0,0.7);
+    border: 2px solid #ff004080;
+    border-radius: 10px;
+    overflow: hidden;
+    z-index: 100;
+    pointer-events: none;
+  }
+  #health-bar {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #ff0040, #ff4444);
+    border-radius: 8px;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 15px #ff004080 inset;
+  }
+  #health-text {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 0 5px #000;
+    letter-spacing: 2px;
+  }
+
+  /* WEAPON PANEL */
+  #weapon-panel {
+    position: fixed;
+    bottom: 55px; left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .weapon-slot {
+    padding: 8px 16px;
+    background: rgba(0,0,0,0.7);
+    border: 2px solid #333;
+    border-radius: 8px;
+    color: #888;
+    font-size: 11px;
+    text-align: center;
+    transition: all 0.2s;
+    min-width: 90px;
+  }
+  .weapon-slot.active {
+    border-color: #00ffcc;
+    color: #00ffcc;
+    background: rgba(0,255,204,0.1);
+    box-shadow: 0 0 15px rgba(0,255,204,0.3);
+  }
+  .weapon-key {
+    font-size: 9px;
+    color: #555;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .weapon-slot.active .weapon-key { color: #00ffcc88; }
+  .weapon-ammo {
+    font-size: 9px;
+    color: #ff6600;
+    display: block;
+    margin-top: 3px;
+  }
+
+  /* SCREENS */
+  .screen-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+    pointer-events: all;
+    cursor: default;
+  }
+  #start-screen {
+    background: radial-gradient(ellipse at center, #1a0a2e 0%, #0a0a1a 70%);
+  }
+  #game-over-screen {
+    background: rgba(10,0,0,0.92);
+    display: none;
+  }
+  .game-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 64px;
+    font-weight: 900;
+    background: linear-gradient(135deg, #ff0040, #ff6600, #ffcc00, #00ffcc, #0088ff, #ff00ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+    margin-bottom: 10px;
+    animation: titlePulse 2s ease-in-out infinite;
+  }
+  @keyframes titlePulse {
+    0%, 100% { filter: brightness(1); transform: scale(1); }
+    50% { filter: brightness(1.3); transform: scale(1.02); }
+  }
+  .game-subtitle {
+    font-size: 16px;
+    color: #ff6600;
+    letter-spacing: 8px;
+    margin-bottom: 40px;
+  }
+  .start-btn {
+    padding: 18px 60px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #ff0040, #cc0033);
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    letter-spacing: 4px;
+    transition: all 0.3s;
+    box-shadow: 0 0 30px #ff004060;
+    margin-bottom: 30px;
+  }
+  .start-btn:hover {
+    transform: scale(1.08);
+    box-shadow: 0 0 50px #ff004090;
+  }
+  .controls-info {
+    color: #555;
+    font-size: 11px;
+    text-align: center;
+    line-height: 2.2;
+    letter-spacing: 1px;
+  }
+  .controls-info span { color: #00ffcc; }
+
+  .game-over-title {
+    font-size: 48px;
+    color: #ff0040;
+    font-weight: 900;
+    margin-bottom: 20px;
+    text-shadow: 0 0 30px #ff004080;
+  }
+  .final-score {
+    font-size: 28px;
+    color: #00ffcc;
+    margin-bottom: 10px;
+  }
+  .final-wave {
+    font-size: 16px;
+    color: #ff6600;
+    margin-bottom: 30px;
+  }
+
+  /* WAVE ANNOUNCEMENT */
+  #wave-announce {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 60px;
+    font-weight: 900;
+    color: #ff6600;
+    text-shadow: 0 0 40px #ff660080, 0 0 80px #ff660040;
+    z-index: 150;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    letter-spacing: 5px;
+  }
+
+  /* POWERUP NOTIFICATION */
+  #powerup-notify {
+    position: fixed;
+    top: 35%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 20px;
+    font-weight: 700;
+    z-index: 150;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    text-shadow: 0 0 20px currentColor;
+  }
+
+  /* DAMAGE FLASH */
+  #damage-flash {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(255,0,0,0.4) 100%);
+    pointer-events: none;
+    z-index: 90;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  /* MINIMAP */
+  #minimap {
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
+    width: 140px;
+    height: 140px;
+    border: 2px solid #333;
+    border-radius: 8px;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  /* KILL FEED */
+  #kill-feed {
+    position: fixed;
+    top: 80px; right: 20px;
+    z-index: 100;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .kill-entry {
+    font-size: 11px;
+    color: #ff4444;
+    text-shadow: 0 0 5px #ff000080;
+    opacity: 1;
+    transition: opacity 0.5s;
+    text-align: right;
+    letter-spacing: 1px;
+  }
+
+  /* ========================================== */
+  /* ============ NEW HUB / MENU ============== */
+  /* ========================================== */
+
+  #hub-screen {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at center, #1a0a2e 0%, #0a0a1a 70%);
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: all;
+    cursor: default;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  #hub-screen::-webkit-scrollbar { width: 6px; }
+  #hub-screen::-webkit-scrollbar-track { background: #0a0a1a; }
+  #hub-screen::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+  .hub-header {
+    width: 100%;
+    padding: 25px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+    flex-shrink: 0;
+  }
+  .hub-title {
+    font-size: 36px;
+    font-weight: 900;
+    background: linear-gradient(135deg, #ff0040, #ff6600, #ffcc00, #00ffcc, #0088ff, #ff00ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hub-currency {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+  }
+  .currency-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid #333;
+    border-radius: 20px;
+  }
+  .currency-icon { font-size: 18px; }
+  .currency-val {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .hub-nav {
+    display: flex;
+    gap: 8px;
+    margin: 10px 0 20px 0;
+    flex-shrink: 0;
+  }
+  .hub-nav-btn {
+    padding: 10px 28px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: #888;
+    background: rgba(0,0,0,0.5);
+    border: 2px solid #333;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: all 0.25s;
+    letter-spacing: 2px;
+  }
+  .hub-nav-btn:hover { border-color: #666; color: #ccc; }
+  .hub-nav-btn.active {
+    border-color: #00ffcc;
+    color: #00ffcc;
+    background: rgba(0,255,204,0.08);
+    box-shadow: 0 0 20px rgba(0,255,204,0.2);
+  }
+
+  .hub-content {
+    flex: 1;
+    width: 100%;
+    max-width: 1100px;
+    padding: 0 30px 40px 30px;
+  }
+
+  /* --- HUB TAB: PLAY --- */
+  .hub-tab { display: none; }
+  .hub-tab.active { display: block; }
+
+  .play-section { text-align: center; padding-top: 30px; }
+  .play-section h2 {
+    font-size: 22px; color: #ff6600; margin-bottom: 25px; letter-spacing: 3px;
+  }
+
+  .difficulty-grid {
+    display: flex;
+    gap: 18px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 35px;
+  }
+  .diff-card {
+    width: 200px;
+    padding: 25px 18px;
+    background: rgba(0,0,0,0.5);
+    border: 2px solid #333;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: center;
+  }
+  .diff-card:hover { transform: translateY(-4px); }
+  .diff-card.selected { box-shadow: 0 0 25px var(--dc); }
+  .diff-card .diff-icon { font-size: 36px; margin-bottom: 10px; }
+  .diff-card .diff-name {
+    font-size: 16px; font-weight: 900; margin-bottom: 6px; letter-spacing: 2px;
+  }
+  .diff-card .diff-desc { font-size: 10px; color: #888; line-height: 1.6; letter-spacing: 0.5px; }
+  .diff-card .diff-mult {
+    margin-top: 10px; font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  }
+
+  .play-btn-big {
+    padding: 22px 80px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 22px;
+    font-weight: 900;
+    color: #fff;
+    background: linear-gradient(135deg, #ff0040, #cc0033);
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    letter-spacing: 6px;
+    transition: all 0.3s;
+    box-shadow: 0 0 40px #ff004060;
+  }
+  .play-btn-big:hover {
+    transform: scale(1.08);
+    box-shadow: 0 0 60px #ff004090;
+  }
+
+  /* --- HUB TAB: CHESTS --- */
+  .chests-section { padding-top: 20px; }
+  .chests-section h2 {
+    font-size: 22px; color: #ffcc00; margin-bottom: 20px; letter-spacing: 3px; text-align:center;
+  }
+  .chest-inventory {
+    display: flex;
+    gap: 18px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 30px;
+  }
+  .chest-card {
+    width: 180px;
+    padding: 25px 15px;
+    background: rgba(0,0,0,0.5);
+    border: 2px solid #444;
+    border-radius: 14px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+  }
+  .chest-card:hover:not(.empty) { transform: translateY(-4px); box-shadow: 0 0 25px rgba(255,204,0,0.3); }
+  .chest-card.empty { opacity: 0.35; cursor: default; }
+  .chest-icon { font-size: 48px; margin-bottom: 10px; display: block; }
+  .chest-name { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 4px; letter-spacing: 1px; }
+  .chest-count { font-size: 11px; color: #ffcc00; font-weight: 700; }
+  .chest-badge {
+    position: absolute;
+    top: -8px; right: -8px;
+    width: 26px; height: 26px;
+    background: #ff0040;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 900;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 10px #ff004080;
+  }
+
+  /* Chest opening overlay */
+  #chest-open-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.9);
+    z-index: 400;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+    pointer-events: all;
+  }
+  #chest-open-overlay.show { display: flex; }
+  .chest-opening-icon {
+    font-size: 100px;
+    animation: chestBounce 0.6s ease-in-out infinite alternate;
+    margin-bottom: 20px;
+  }
+  @keyframes chestBounce {
+    0% { transform: scale(1) rotate(-3deg); }
+    100% { transform: scale(1.1) rotate(3deg); }
+  }
+  .chest-reveal { text-align: center; }
+  .chest-reward-list {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 20px 0;
+  }
+  .reward-item {
+    padding: 14px 22px;
+    background: rgba(0,0,0,0.6);
+    border: 2px solid;
+    border-radius: 10px;
+    text-align: center;
+    animation: rewardPop 0.4s ease-out forwards;
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  @keyframes rewardPop {
+    to { opacity: 1; transform: scale(1); }
+  }
+  .reward-icon { font-size: 28px; display: block; margin-bottom: 6px; }
+  .reward-text { font-size: 12px; font-weight: 700; }
+  .chest-close-btn {
+    margin-top: 25px;
+    padding: 12px 50px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    background: #333;
+    border: 2px solid #555;
+    border-radius: 30px;
+    cursor: pointer;
+    letter-spacing: 2px;
+    transition: all 0.2s;
+  }
+  .chest-close-btn:hover { background: #444; border-color: #888; }
+
+  /* --- HUB TAB: ARMORY (gun upgrades) --- */
+  .armory-section { padding-top: 20px; }
+  .armory-section h2 {
+    font-size: 22px; color: #00ffcc; margin-bottom: 20px; letter-spacing: 3px; text-align: center;
+  }
+  .armory-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .gun-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 18px 22px;
+    background: rgba(0,0,0,0.5);
+    border: 2px solid #333;
+    border-radius: 14px;
+    transition: border-color 0.2s;
+  }
+  .gun-card:hover { border-color: #555; }
+  .gun-icon { font-size: 36px; flex-shrink: 0; width: 50px; text-align: center; }
+  .gun-info { flex: 1; }
+  .gun-name { font-size: 15px; font-weight: 900; color: #fff; margin-bottom: 4px; letter-spacing: 1px; }
+  .gun-level { font-size: 10px; color: #888; letter-spacing: 1px; }
+  .gun-stats {
+    display: flex;
+    gap: 14px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .gun-stat {
+    font-size: 10px;
+    color: #aaa;
+    letter-spacing: 0.5px;
+  }
+  .gun-stat span { color: #00ffcc; font-weight: 700; }
+  .gun-upgrades {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .gun-upgrade-btn {
+    padding: 8px 14px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    color: #ffcc00;
+    background: rgba(255,204,0,0.1);
+    border: 1px solid #ffcc0060;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    min-width: 80px;
+  }
+  .gun-upgrade-btn:hover:not(.maxed) { background: rgba(255,204,0,0.2); border-color: #ffcc00; }
+  .gun-upgrade-btn .cost { display: block; font-size: 9px; color: #ff6600; margin-top: 2px; }
+  .gun-upgrade-btn.maxed { color: #00ff44; border-color: #00ff4440; cursor: default; }
+  .gun-upgrade-btn.cant-afford { opacity: 0.4; }
+
+  /* --- HUB TAB: SKILL TREE --- */
+  .tree-section { padding-top: 20px; }
+  .tree-section h2 {
+    font-size: 22px; color: #ff00ff; margin-bottom: 8px; letter-spacing: 3px; text-align: center;
+  }
+  .tree-tokens {
+    text-align: center;
+    font-size: 13px;
+    color: #ff00ff;
+    margin-bottom: 20px;
+    letter-spacing: 1px;
+  }
+  .tree-tokens span { font-weight: 900; font-size: 18px; }
+
+  .skill-tree {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    align-items: center;
+  }
+  .tree-row {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .tree-row-label {
+    width: 100%;
+    text-align: center;
+    font-size: 10px;
+    color: #666;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: -8px;
+  }
+  .skill-node {
+    width: 130px;
+    padding: 14px 10px;
+    background: rgba(0,0,0,0.5);
+    border: 2px solid #333;
+    border-radius: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+  }
+  .skill-node:hover:not(.locked):not(.maxed-node) { border-color: #888; transform: translateY(-2px); }
+  .skill-node.unlocked { border-color: #ff00ff80; box-shadow: 0 0 15px rgba(255,0,255,0.15); }
+  .skill-node.maxed-node { border-color: #00ff4480; box-shadow: 0 0 15px rgba(0,255,68,0.15); }
+  .skill-node.locked { opacity: 0.3; cursor: default; }
+  .skill-node .sk-icon { font-size: 24px; display: block; margin-bottom: 6px; }
+  .skill-node .sk-name { font-size: 10px; font-weight: 700; color: #fff; margin-bottom: 3px; letter-spacing: 0.5px; }
+  .skill-node .sk-level { font-size: 9px; color: #888; }
+  .skill-node .sk-desc { font-size: 8px; color: #666; margin-top: 4px; line-height: 1.4; }
+  .skill-node .sk-cost { font-size: 9px; color: #ff00ff; margin-top: 6px; font-weight: 700; }
+  .skill-node.maxed-node .sk-cost { color: #00ff44; }
+
+  /* GAME OVER REWARDS */
+  .go-rewards {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    margin: 12px 0 20px 0;
+    flex-wrap: wrap;
+  }
+  .go-reward {
+    padding: 8px 16px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid #444;
+    border-radius: 8px;
+    text-align: center;
+  }
+  .go-reward .go-r-icon { font-size: 20px; }
+  .go-reward .go-r-text { font-size: 11px; color: #ffcc00; font-weight: 700; margin-top: 4px; }
+
+  /* Difficulty badge in HUD */
+  #diff-badge {
+    position: fixed;
+    top: 15px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    z-index: 100;
+    pointer-events: none;
+    padding: 4px 14px;
+    border-radius: 10px;
+    border: 1px solid;
+    opacity: 0.7;
+  }
+</style>
+</head>
+<body>
+
+<!-- CROSSHAIR -->
+<div id="crosshair"><div id="crosshair-dot"></div></div>
+
+<!-- DAMAGE FLASH -->
+<div id="damage-flash"></div>
+
+<!-- DIFFICULTY BADGE -->
+<div id="diff-badge" style="display:none;"></div>
+
+<!-- HUD -->
+<div id="hud" style="display:none;">
+  <div class="hud-section">
+    <div class="hud-label">SCORE</div>
+    <div class="hud-value score" id="score-display">0</div>
+  </div>
+  <div class="hud-section" style="align-items:center;">
+    <div class="hud-label">WAVE</div>
+    <div class="hud-value wave" id="wave-display">1</div>
+  </div>
+  <div class="hud-section" style="align-items:center;">
+    <div class="hud-label">COMBO</div>
+    <div class="hud-value combo" id="combo-display">x1</div>
+  </div>
+  <div class="hud-section" style="align-items:flex-end;">
+    <div class="hud-label">ENEMIES LEFT</div>
+    <div class="hud-value" id="enemies-display" style="color:#ff4444;">0</div>
+  </div>
+</div>
+
+<!-- WEAPON PANEL -->
+<div id="weapon-panel" style="display:none;">
+  <div class="weapon-slot active" id="weapon-0">
+    <span class="weapon-key">[1]</span>🔫 Pistol
+    <span class="weapon-ammo">∞</span>
+  </div>
+  <div class="weapon-slot" id="weapon-1">
+    <span class="weapon-key">[2]</span>⚡ SMG
+    <span class="weapon-ammo" id="ammo-1">0</span>
+  </div>
+  <div class="weapon-slot" id="weapon-2">
+    <span class="weapon-key">[3]</span>💥 Shotgun
+    <span class="weapon-ammo" id="ammo-2">0</span>
+  </div>
+  <div class="weapon-slot" id="weapon-3">
+    <span class="weapon-key">[4]</span>🎯 Sniper
+    <span class="weapon-ammo" id="ammo-3">0</span>
+  </div>
+  <div class="weapon-slot" id="weapon-4">
+    <span class="weapon-key">[5]</span>🚀 Rocket
+    <span class="weapon-ammo" id="ammo-4">0</span>
+  </div>
+</div>
+
+<!-- HEALTH BAR -->
+<div id="health-container" style="display:none;">
+  <div id="health-bar"></div>
+  <div id="health-text">HP 100/100</div>
+</div>
+
+<!-- MINIMAP -->
+<canvas id="minimap" style="display:none;"></canvas>
+
+<!-- KILL FEED -->
+<div id="kill-feed"></div>
+
+<!-- WAVE ANNOUNCEMENT -->
+<div id="wave-announce"></div>
+<div id="powerup-notify"></div>
+
+<!-- CANVAS -->
+<canvas id="gameCanvas"></canvas>
+
+<!-- ============ HUB SCREEN ============ -->
+<div id="hub-screen">
+  <div class="hub-header">
+    <div class="hub-title">NEON BLASTER</div>
+    <div class="hub-currency">
+      <div class="currency-item">
+        <span class="currency-icon">💰</span>
+        <span class="currency-val" id="hub-credits">0</span>
+      </div>
+      <div class="currency-item">
+        <span class="currency-icon">🔮</span>
+        <span class="currency-val" id="hub-tokens">0</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="hub-nav">
+    <button class="hub-nav-btn active" data-tab="play">▶ PLAY</button>
+    <button class="hub-nav-btn" data-tab="chests">🎁 CHESTS</button>
+    <button class="hub-nav-btn" data-tab="armory">🔧 ARMORY</button>
+    <button class="hub-nav-btn" data-tab="tree">🌟 SKILLS</button>
+  </div>
+
+  <div class="hub-content">
+    <!-- PLAY TAB -->
+    <div class="hub-tab active" id="tab-play">
+      <div class="play-section">
+        <h2>SELECT DIFFICULTY</h2>
+        <div class="difficulty-grid" id="diff-grid"></div>
+        <button class="play-btn-big" id="hub-play-btn">▶ DEPLOY</button>
+        <div class="controls-info" style="margin-top:20px;">
+          <span>W A S D</span> — Move &nbsp;|&nbsp; <span>MOUSE</span> — Aim &nbsp;|&nbsp; <span>CLICK</span> — Shoot<br>
+          <span>1-5</span> — Switch Weapons &nbsp;|&nbsp; <span>R</span> — Reload &nbsp;|&nbsp; <span>SPACE</span> — Dash<br>
+          <span>E</span> — Grenade &nbsp;|&nbsp; Kill enemies to earn score & unlock weapons!
+        </div>
+      </div>
+    </div>
+
+    <!-- CHESTS TAB -->
+    <div class="hub-tab" id="tab-chests">
+      <div class="chests-section">
+        <h2>🎁 YOUR CHESTS</h2>
+        <div class="chest-inventory" id="chest-inventory"></div>
+        <p style="text-align:center;color:#666;font-size:11px;letter-spacing:1px;">Earn chests by surviving waves! Better performance = better chests.</p>
+      </div>
+    </div>
+
+    <!-- ARMORY TAB -->
+    <div class="hub-tab" id="tab-armory">
+      <div class="armory-section">
+        <h2>🔧 WEAPON UPGRADES</h2>
+        <div class="armory-grid" id="armory-grid"></div>
+      </div>
+    </div>
+
+    <!-- SKILL TREE TAB -->
+    <div class="hub-tab" id="tab-tree">
+      <div class="tree-section">
+        <h2>🌟 SKILL TREE</h2>
+        <div class="tree-tokens">Skill Tokens: <span id="token-display">0</span></div>
+        <div class="skill-tree" id="skill-tree"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CHEST OPENING OVERLAY -->
+<div id="chest-open-overlay">
+  <div class="chest-opening-icon" id="chest-open-icon">📦</div>
+  <div class="chest-reveal" id="chest-reveal" style="display:none;">
+    <div style="font-size:20px;color:#ffcc00;font-weight:900;letter-spacing:3px;margin-bottom:5px;">REWARDS</div>
+    <div class="chest-reward-list" id="chest-reward-list"></div>
+    <button class="chest-close-btn" id="chest-close-btn">COLLECT</button>
+  </div>
+</div>
+
+<!-- GAME OVER SCREEN -->
+<div class="screen-overlay" id="game-over-screen" style="display:none;">
+  <div class="game-over-title">GAME OVER</div>
+  <div class="final-score" id="final-score">SCORE: 0</div>
+  <div class="final-wave" id="final-wave">WAVE: 1</div>
+  <div class="go-rewards" id="go-rewards"></div>
+  <button class="start-btn" id="restart-btn">↻ RETURN TO HUB</button>
+</div>
+
+<script>
+// ====================== GAME ENGINE ======================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const minimapCanvas = document.getElementById('minimap');
+const minimapCtx = minimapCanvas.getContext('2d');
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+minimapCanvas.width = 140;
+minimapCanvas.height = 140;
+
+window.addEventListener('resize', () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+});
+
+// ====================== PERSISTENT SAVE DATA ======================
+const DEFAULT_SAVE = {
+  credits: 500,
+  tokens: 2,
+  chestsOwned: { bronze: 2, silver: 0, gold: 0, legendary: 0 },
+  gunLevels: { // per-weapon per-stat levels
+    pistol:  { damage: 0, fireRate: 0, ammo: 0 },
+    smg:     { damage: 0, fireRate: 0, ammo: 0 },
+    shotgun: { damage: 0, fireRate: 0, ammo: 0 },
+    sniper:  { damage: 0, fireRate: 0, ammo: 0 },
+    rocket:  { damage: 0, fireRate: 0, ammo: 0 },
+  },
+  skills: {
+    vitality: 0,   // +20 HP per level, max 5
+    agility: 0,    // +0.5 speed per level, max 5
+    quickDash: 0,  // -12 dash cd per level, max 5
+    demolition: 0, // +1 grenade cap per level, max 5
+    armor: 0,      // -8% damage taken per level, max 5
+    scavenger: 0,  // +10% powerup chance per level, max 5
+    marksman: 0,   // +8% global dmg per level, max 5
+    windrunner: 0, // +15% dash speed per level, max 3
+    critStrike: 0, // +6% crit chance per level, max 5
+    lastStand: 0,  // survive lethal once per game, max 1
+  },
+  selectedDifficulty: 'normal',
+  totalGamesPlayed: 0,
+  bestScore: 0,
+  bestWave: 0,
+};
+
+let saveData;
+function loadSave() {
+  try {
+    const raw = localStorage.getItem('neonblaster_save');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Deep merge with defaults to handle new fields
+      saveData = deepMerge(JSON.parse(JSON.stringify(DEFAULT_SAVE)), parsed);
+    } else {
+      saveData = JSON.parse(JSON.stringify(DEFAULT_SAVE));
+    }
+  } catch(e) {
+    saveData = JSON.parse(JSON.stringify(DEFAULT_SAVE));
+  }
+}
+function writeSave() {
+  localStorage.setItem('neonblaster_save', JSON.stringify(saveData));
+}
+function deepMerge(target, source) {
+  for (const key of Object.keys(target)) {
+    if (source.hasOwnProperty(key)) {
+      if (typeof target[key] === 'object' && !Array.isArray(target[key]) && target[key] !== null) {
+        target[key] = deepMerge(target[key], source[key] || {});
+      } else {
+        target[key] = source[key];
+      }
+    }
+  }
+  return target;
+}
+loadSave();
+
+// ====================== DIFFICULTY DEFINITIONS ======================
+const DIFFICULTIES = {
+  easy:      { label: 'EASY',      icon: '😊', color: '#00ff88', enemyHpMult: 0.7, enemySpdMult: 0.8, spawnMult: 0.8, dmgMult: 0.7, rewardMult: 0.6, desc: 'Relaxed gameplay.\nFewer & weaker enemies.' },
+  normal:    { label: 'NORMAL',    icon: '😐', color: '#00ccff', enemyHpMult: 1.0, enemySpdMult: 1.0, spawnMult: 1.0, dmgMult: 1.0, rewardMult: 1.0, desc: 'Standard challenge.\nBalanced experience.' },
+  hard:      { label: 'HARD',      icon: '😠', color: '#ff8800', enemyHpMult: 1.5, enemySpdMult: 1.2, spawnMult: 1.3, dmgMult: 1.4, rewardMult: 1.5, desc: 'Increased danger.\nMore enemies, tougher.' },
+  nightmare: { label: 'NIGHTMARE', icon: '💀', color: '#ff0040', enemyHpMult: 2.2, enemySpdMult: 1.4, spawnMult: 1.7, dmgMult: 2.0, rewardMult: 2.5, desc: 'Brutal onslaught.\nFor veterans only.' },
+};
+
+// ====================== SKILL TREE DEFINITIONS ======================
+const SKILL_DEFS = {
+  vitality:    { name: 'Vitality',     icon: '❤️',  max: 5, cost: [1,1,2,2,3], row: 0, desc: '+20 Max HP per level', requires: [] },
+  agility:     { name: 'Agility',      icon: '👟',  max: 5, cost: [1,1,2,2,3], row: 0, desc: '+0.5 Move Speed per level', requires: [] },
+  marksman:    { name: 'Marksman',     icon: '🎯',  max: 5, cost: [1,1,2,2,3], row: 0, desc: '+8% Global Damage per level', requires: [] },
+  quickDash:   { name: 'Quick Dash',   icon: '💨',  max: 5, cost: [1,1,2,3,3], row: 1, desc: '-12 Dash Cooldown per level', requires: ['agility'] },
+  armor:       { name: 'Armor',        icon: '🛡️',  max: 5, cost: [1,2,2,3,3], row: 1, desc: '-8% Damage Taken per level', requires: ['vitality'] },
+  scavenger:   { name: 'Scavenger',    icon: '🧲',  max: 5, cost: [1,1,2,2,3], row: 1, desc: '+10% Powerup Drop Rate per level', requires: ['marksman'] },
+  demolition:  { name: 'Demolition',   icon: '💣',  max: 5, cost: [1,2,2,3,4], row: 2, desc: '+1 Grenade Capacity per level', requires: ['armor'] },
+  windrunner:  { name: 'Wind Runner',  icon: '🌪️',  max: 3, cost: [2,3,4],     row: 2, desc: '+15% Dash Speed per level', requires: ['quickDash'] },
+  critStrike:  { name: 'Crit Strike',  icon: '⚡',  max: 5, cost: [1,2,2,3,4], row: 2, desc: '+6% Crit Chance per level', requires: ['scavenger'] },
+  lastStand:   { name: 'Last Stand',   icon: '🔥',  max: 1, cost: [5],          row: 3, desc: 'Survive a lethal hit once per game\n(restores 30 HP)', requires: ['armor','demolition'] },
+};
+
+// ====================== GUN UPGRADE DEFINITIONS ======================
+const GUN_DEFS = [
+  { key: 'pistol',  icon: '🔫', name: 'Pistol',  baseDmg: 25,  baseRate: 15, baseAmmo: Infinity, dmgPerLvl: 5,  ratePerLvl: 1,  ammoPerLvl: 0,  maxLvl: 10, costBase: 100 },
+  { key: 'smg',     icon: '⚡', name: 'SMG',     baseDmg: 12,  baseRate: 5,  baseAmmo: 200,     dmgPerLvl: 3,  ratePerLvl: 0,  ammoPerLvl: 30, maxLvl: 10, costBase: 150 },
+  { key: 'shotgun', icon: '💥', name: 'Shotgun', baseDmg: 18,  baseRate: 30, baseAmmo: 40,      dmgPerLvl: 4,  ratePerLvl: 2,  ammoPerLvl: 8,  maxLvl: 10, costBase: 200 },
+  { key: 'sniper',  icon: '🎯', name: 'Sniper',  baseDmg: 120, baseRate: 50, baseAmmo: 20,      dmgPerLvl: 20, ratePerLvl: 3,  ammoPerLvl: 4,  maxLvl: 10, costBase: 250 },
+  { key: 'rocket',  icon: '🚀', name: 'Rocket',  baseDmg: 80,  baseRate: 60, baseAmmo: 15,      dmgPerLvl: 15, ratePerLvl: 4,  ammoPerLvl: 3,  maxLvl: 10, costBase: 300 },
+];
+
+function getGunUpgradeCost(gunKey, statKey) {
+  const def = GUN_DEFS.find(g => g.key === gunKey);
+  const lvl = saveData.gunLevels[gunKey][statKey];
+  return Math.floor(def.costBase * (1 + lvl * 0.6));
+}
+
+function getAppliedWeaponStats() {
+  // Returns the weapon array with upgrades applied
+  const base = [
+    { name: 'Pistol',  fireRate: 15, damage: 25, speed: 14, spread: 0.03, projectiles: 1, ammo: Infinity, maxAmmo: Infinity, reloadTime: 0, piercing: false, explosive: false, color: '#ffcc00', size: 4, sound: 'pistol' },
+    { name: 'SMG',     fireRate: 5,  damage: 12, speed: 16, spread: 0.12, projectiles: 1, ammo: 0, maxAmmo: 200, reloadTime: 45, piercing: false, explosive: false, color: '#00ffcc', size: 3, sound: 'smg' },
+    { name: 'Shotgun', fireRate: 30, damage: 18, speed: 12, spread: 0.15, projectiles: 7, ammo: 0, maxAmmo: 40, reloadTime: 60, piercing: false, explosive: false, color: '#ff8800', size: 5, sound: 'shotgun' },
+    { name: 'Sniper',  fireRate: 50, damage: 120, speed: 25, spread: 0, projectiles: 1, ammo: 0, maxAmmo: 20, reloadTime: 70, piercing: true, explosive: false, color: '#ff00ff', size: 3, sound: 'sniper' },
+    { name: 'Rocket',  fireRate: 60, damage: 80, speed: 8, spread: 0.02, projectiles: 1, ammo: 0, maxAmmo: 15, reloadTime: 80, piercing: false, explosive: true, color: '#ff0040', size: 8, sound: 'rocket' }
+  ];
+
+  const gunKeys = ['pistol','smg','shotgun','sniper','rocket'];
+  for (let i = 0; i < 5; i++) {
+    const g = saveData.gunLevels[gunKeys[i]];
+    const d = GUN_DEFS[i];
+    base[i].damage += d.dmgPerLvl * g.damage;
+    base[i].fireRate = Math.max(2, base[i].fireRate - d.ratePerLvl * g.fireRate);
+    if (base[i].maxAmmo !== Infinity) {
+      base[i].maxAmmo += d.ammoPerLvl * g.ammo;
+    }
+  }
+  return base;
+}
+
+// ====================== CHEST DEFINITIONS ======================
+const CHEST_DEFS = {
+  bronze:    { icon: '📦', name: 'Bronze Chest',    color: '#cd7f32', rewards: { credits: [80,200],   tokens: [0,0],   chestChance: 0 } },
+  silver:    { icon: '🥈', name: 'Silver Chest',    color: '#c0c0c0', rewards: { credits: [200,500],  tokens: [0,1],   chestChance: 0.15 } },
+  gold:      { icon: '🥇', name: 'Gold Chest',      color: '#ffd700', rewards: { credits: [400,1000], tokens: [1,2],   chestChance: 0.25 } },
+  legendary: { icon: '💎', name: 'Legendary Chest',  color: '#ff00ff', rewards: { credits: [800,2000], tokens: [2,4],   chestChance: 0.4 } },
+};
+
+function openChest(type) {
+  if (!saveData.chestsOwned[type] || saveData.chestsOwned[type] <= 0) return;
+  saveData.chestsOwned[type]--;
+
+  const def = CHEST_DEFS[type];
+  const rewards = [];
+
+  // Credits
+  const cr = Math.floor(def.rewards.credits[0] + Math.random() * (def.rewards.credits[1] - def.rewards.credits[0]));
+  saveData.credits += cr;
+  rewards.push({ icon: '💰', text: `+${cr} Credits`, color: '#ffcc00' });
+
+  // Tokens
+  const tkMin = def.rewards.tokens[0];
+  const tkMax = def.rewards.tokens[1];
+  const tk = tkMin + Math.floor(Math.random() * (tkMax - tkMin + 1));
+  if (tk > 0) {
+    saveData.tokens += tk;
+    rewards.push({ icon: '🔮', text: `+${tk} Token${tk > 1 ? 's' : ''}`, color: '#ff00ff' });
+  }
+
+  // Bonus chest
+  if (Math.random() < def.chestChance) {
+    const types = Object.keys(CHEST_DEFS);
+    const idx = Math.min(types.indexOf(type), types.length - 1);
+    const bonusType = types[Math.max(0, idx - 1 + Math.floor(Math.random() * 2))];
+    saveData.chestsOwned[bonusType] = (saveData.chestsOwned[bonusType] || 0) + 1;
+    rewards.push({ icon: CHEST_DEFS[bonusType].icon, text: `+1 ${CHEST_DEFS[bonusType].name}`, color: CHEST_DEFS[bonusType].color });
+  }
+
+  writeSave();
+  showChestOpening(def, rewards);
+}
+
+// ====================== HUB UI LOGIC ======================
+function showHub() {
+  document.getElementById('hub-screen').style.display = 'flex';
+  document.getElementById('game-over-screen').style.display = 'none';
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('weapon-panel').style.display = 'none';
+  document.getElementById('health-container').style.display = 'none';
+  document.getElementById('minimap').style.display = 'none';
+  document.getElementById('diff-badge').style.display = 'none';
+  document.body.style.cursor = 'default';
+  document.getElementById('crosshair').style.display = 'none';
+  refreshHub();
+}
+
+function hideHub() {
+  document.getElementById('hub-screen').style.display = 'none';
+  document.getElementById('hud').style.display = 'flex';
+  document.getElementById('weapon-panel').style.display = 'flex';
+  document.getElementById('health-container').style.display = 'block';
+  document.getElementById('minimap').style.display = 'block';
+  document.getElementById('diff-badge').style.display = 'block';
+  document.body.style.cursor = 'none';
+  document.getElementById('crosshair').style.display = 'block';
+}
+
+function refreshHub() {
+  document.getElementById('hub-credits').textContent = saveData.credits.toLocaleString();
+  document.getElementById('hub-tokens').textContent = saveData.tokens;
+  document.getElementById('token-display').textContent = saveData.tokens;
+  renderDifficultyCards();
+  renderChestInventory();
+  renderArmory();
+  renderSkillTree();
+}
+
+// Tab switching
+document.querySelectorAll('.hub-nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.hub-nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.hub-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ---- DIFFICULTY CARDS ----
+function renderDifficultyCards() {
+  const grid = document.getElementById('diff-grid');
+  grid.innerHTML = '';
+  for (const [key, d] of Object.entries(DIFFICULTIES)) {
+    const card = document.createElement('div');
+    card.className = 'diff-card' + (saveData.selectedDifficulty === key ? ' selected' : '');
+    card.style.setProperty('--dc', d.color);
+    card.style.borderColor = saveData.selectedDifficulty === key ? d.color : '#333';
+    card.innerHTML = `
+      <div class="diff-icon">${d.icon}</div>
+      <div class="diff-name" style="color:${d.color}">${d.label}</div>
+      <div class="diff-desc">${d.desc.replace(/\n/g,'<br>')}</div>
+      <div class="diff-mult" style="color:${d.color}">REWARDS x${d.rewardMult}</div>
+    `;
+    card.addEventListener('click', () => {
+      saveData.selectedDifficulty = key;
+      writeSave();
+      renderDifficultyCards();
+    });
+    grid.appendChild(card);
+  }
+}
+
+// ---- CHEST INVENTORY ----
+function renderChestInventory() {
+  const container = document.getElementById('chest-inventory');
+  container.innerHTML = '';
+  for (const [type, def] of Object.entries(CHEST_DEFS)) {
+    const count = saveData.chestsOwned[type] || 0;
+    const card = document.createElement('div');
+    card.className = 'chest-card' + (count <= 0 ? ' empty' : '');
+    card.innerHTML = `
+      <span class="chest-icon">${def.icon}</span>
+      <div class="chest-name" style="color:${def.color}">${def.name}</div>
+      <div class="chest-count">x${count}</div>
+      ${count > 0 ? `<div class="chest-badge">${count}</div>` : ''}
+    `;
+    if (count > 0) {
+      card.addEventListener('click', () => openChest(type));
+    }
+    container.appendChild(card);
+  }
+}
+
+function showChestOpening(def, rewards) {
+  const overlay = document.getElementById('chest-open-overlay');
+  const icon = document.getElementById('chest-open-icon');
+  const reveal = document.getElementById('chest-reveal');
+  const list = document.getElementById('chest-reward-list');
+
+  overlay.classList.add('show');
+  icon.textContent = def.icon;
+  icon.style.display = 'block';
+  reveal.style.display = 'none';
+
+  setTimeout(() => {
+    icon.style.display = 'none';
+    reveal.style.display = 'block';
+    list.innerHTML = '';
+    rewards.forEach((r, i) => {
+      const el = document.createElement('div');
+      el.className = 'reward-item';
+      el.style.borderColor = r.color;
+      el.style.animationDelay = (i * 0.15) + 's';
+      el.innerHTML = `<span class="reward-icon">${r.icon}</span><div class="reward-text" style="color:${r.color}">${r.text}</div>`;
+      list.appendChild(el);
+    });
+  }, 1200);
+}
+document.getElementById('chest-close-btn').addEventListener('click', () => {
+  document.getElementById('chest-open-overlay').classList.remove('show');
+  refreshHub();
+});
+
+// ---- ARMORY ----
+function renderArmory() {
+  const grid = document.getElementById('armory-grid');
+  grid.innerHTML = '';
+  const statLabels = { damage: 'DMG', fireRate: 'RATE', ammo: 'AMMO' };
+  const appliedWeapons = getAppliedWeaponStats();
+
+  GUN_DEFS.forEach((gd, idx) => {
+    const card = document.createElement('div');
+    card.className = 'gun-card';
+    const lvls = saveData.gunLevels[gd.key];
+    const w = appliedWeapons[idx];
+
+    let statsHtml = '';
+    statsHtml += `<span class="gun-stat">DMG: <span>${w.damage}</span></span>`;
+    statsHtml += `<span class="gun-stat">RATE: <span>${w.fireRate}f</span></span>`;
+    statsHtml += `<span class="gun-stat">AMMO: <span>${w.maxAmmo === Infinity ? '∞' : w.maxAmmo}</span></span>`;
+
+    let btnsHtml = '';
+    for (const [stat, label] of Object.entries(statLabels)) {
+      if (stat === 'ammo' && gd.key === 'pistol') {
+        btnsHtml += `<div class="gun-upgrade-btn maxed" style="min-width:80px;"><div>AMMO</div><div style="font-size:9px;color:#00ff44;margin-top:2px;">∞</div></div>`;
+        continue;
+      }
+      const lvl = lvls[stat];
+      const max = gd.maxLvl;
+      if (lvl >= max) {
+        btnsHtml += `<div class="gun-upgrade-btn maxed" style="min-width:80px;"><div>${label}</div><div style="font-size:9px;color:#00ff44;margin-top:2px;">MAX</div></div>`;
+      } else {
+        const cost = getGunUpgradeCost(gd.key, stat);
+        const canAfford = saveData.credits >= cost;
+        btnsHtml += `<div class="gun-upgrade-btn${canAfford ? '' : ' cant-afford'}" data-gun="${gd.key}" data-stat="${stat}" style="min-width:80px;">
+          <div>${label} Lv${lvl}</div>
+          <span class="cost">💰 ${cost}</span>
+        </div>`;
+      }
+    }
+
+    const totalLvl = lvls.damage + lvls.fireRate + lvls.ammo;
+    card.innerHTML = `
+      <div class="gun-icon">${gd.icon}</div>
+      <div class="gun-info">
+        <div class="gun-name">${gd.name}</div>
+        <div class="gun-level">TOTAL UPGRADES: ${totalLvl}</div>
+        <div class="gun-stats">${statsHtml}</div>
+      </div>
+      <div class="gun-upgrades">${btnsHtml}</div>
+    `;
+    grid.appendChild(card);
+  });
+
+  // Bind upgrade buttons
+  grid.querySelectorAll('.gun-upgrade-btn[data-gun]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const gun = btn.dataset.gun;
+      const stat = btn.dataset.stat;
+      const cost = getGunUpgradeCost(gun, stat);
+      if (saveData.credits >= cost && saveData.gunLevels[gun][stat] < GUN_DEFS.find(g=>g.key===gun).maxLvl) {
+        saveData.credits -= cost;
+        saveData.gunLevels[gun][stat]++;
+        writeSave();
+        refreshHub();
+      }
+    });
+  });
+}
+
+// ---- SKILL TREE ----
+function renderSkillTree() {
+  const container = document.getElementById('skill-tree');
+  container.innerHTML = '';
+  document.getElementById('token-display').textContent = saveData.tokens;
+
+  // Group by row
+  const rows = {};
+  for (const [key, def] of Object.entries(SKILL_DEFS)) {
+    if (!rows[def.row]) rows[def.row] = [];
+    rows[def.row].push({ key, ...def });
+  }
+
+  const rowLabels = ['TIER 1 — FOUNDATION', 'TIER 2 — SPECIALIZATION', 'TIER 3 — MASTERY', 'TIER 4 — ULTIMATE'];
+
+  for (const rowIdx of Object.keys(rows).sort((a,b)=>a-b)) {
+    const label = document.createElement('div');
+    label.className = 'tree-row-label';
+    label.textContent = rowLabels[rowIdx] || `TIER ${parseInt(rowIdx)+1}`;
+    container.appendChild(label);
+
+    const row = document.createElement('div');
+    row.className = 'tree-row';
+
+    rows[rowIdx].forEach(skill => {
+      const lvl = saveData.skills[skill.key] || 0;
+      const isMaxed = lvl >= skill.max;
+      const requiresMet = skill.requires.every(r => (saveData.skills[r] || 0) >= 1);
+      const isLocked = !requiresMet && lvl === 0;
+      const nextCost = !isMaxed ? skill.cost[lvl] : 0;
+
+      const node = document.createElement('div');
+      node.className = 'skill-node' + (isMaxed ? ' maxed-node' : isLocked ? ' locked' : lvl > 0 ? ' unlocked' : '');
+      node.innerHTML = `
+        <span class="sk-icon">${skill.icon}</span>
+        <div class="sk-name">${skill.name}</div>
+        <div class="sk-level">${lvl} / ${skill.max}</div>
+        <div class="sk-desc">${skill.desc}${skill.requires.length ? '<br>Requires: ' + skill.requires.map(r=>SKILL_DEFS[r].name).join(', ') : ''}</div>
+        <div class="sk-cost">${isMaxed ? '✓ MAXED' : isLocked ? '🔒 LOCKED' : `🔮 ${nextCost} Token${nextCost>1?'s':''}`}</div>
+      `;
+      if (!isMaxed && !isLocked) {
+        node.addEventListener('click', () => {
+          if (saveData.tokens >= nextCost) {
+            saveData.tokens -= nextCost;
+            saveData.skills[skill.key]++;
+            writeSave();
+            refreshHub();
+          }
+        });
+      }
+      row.appendChild(node);
+    });
+
+    container.appendChild(row);
+  }
+}
+
+// ====================== PLAY BUTTON ======================
+document.getElementById('hub-play-btn').addEventListener('click', () => {
+  hideHub();
+  initGame();
+});
+
+// ====================== GAME STATE ======================
+let gameRunning = false;
+let score = 0;
+let wave = 1;
+let combo = 0;
+let comboTimer = 0;
+let shakeTimer = 0;
+let shakeIntensity = 0;
+let grenades = 3;
+let lastStandUsed = false;
+let currentDifficulty = {};
+
+const WORLD_SIZE = 3000;
+
+// ====================== PLAYER ======================
+const player = {
+  x: WORLD_SIZE / 2, y: WORLD_SIZE / 2,
+  radius: 18,
+  speed: 4.5,
+  hp: 100, maxHp: 100,
+  angle: 0,
+  weapon: 0,
+  shootCooldown: 0,
+  dashCooldown: 0,
+  isDashing: false,
+  dashTimer: 0,
+  dashAngle: 0,
+  invincible: 0,
+  speedBoost: 0,
+  damageBoost: 0,
+  grenades: 3
+};
+
+// ====================== WEAPONS (set at game start) ======================
+let weapons = [];
+
+// ====================== ENTITY ARRAYS ======================
+let bullets = [];
+let enemies = [];
+let particles = [];
+let powerups = [];
+let grenadeProjectiles = [];
+let damageNumbers = [];
+let trailParticles = [];
+let stars = [];
+
+// Generate stars
+for (let i = 0; i < 400; i++) {
+  stars.push({
+    x: Math.random() * WORLD_SIZE,
+    y: Math.random() * WORLD_SIZE,
+    size: Math.random() * 2 + 0.5,
+    brightness: Math.random() * 0.5 + 0.2,
+    twinkleSpeed: Math.random() * 0.02 + 0.005
+  });
+}
+
+// ====================== INPUT ======================
+const keys = {};
+let mouseX = 0, mouseY = 0;
+let mouseDown = false;
+
+document.addEventListener('keydown', e => {
+  if (document.getElementById('hub-screen').style.display !== 'none') return;
+  keys[e.key.toLowerCase()] = true; e.preventDefault();
+});
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+document.addEventListener('mousemove', e => {
+  mouseX = e.clientX; mouseY = e.clientY;
+  document.getElementById('crosshair').style.left = mouseX + 'px';
+  document.getElementById('crosshair').style.top = mouseY + 'px';
+});
+document.addEventListener('mousedown', e => { if (e.button === 0) mouseDown = true; });
+document.addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; });
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// Weapon switching
+document.addEventListener('keydown', e => {
+  if (!gameRunning) return;
+  const num = parseInt(e.key);
+  if (num >= 1 && num <= 5) {
+    const idx = num - 1;
+    if (idx === 0 || weapons[idx].ammo > 0) {
+      player.weapon = idx;
+      updateWeaponUI();
+    }
+  }
+  if (e.key.toLowerCase() === 'e') throwGrenade();
+  if (e.key === ' ') attemptDash();
+});
+
+// ====================== AUDIO SYSTEM ======================
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+}
+
+function playSound(type) {
+  ensureAudio();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  const now = audioCtx.currentTime;
+  switch(type) {
+    case 'pistol':
+      osc.type = 'square'; osc.frequency.setValueAtTime(600, now);
+      osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      osc.start(now); osc.stop(now + 0.1);
+      break;
+    case 'smg':
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(200, now + 0.05);
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+      osc.start(now); osc.stop(now + 0.06);
+      break;
+    case 'shotgun':
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, now);
+      osc.frequency.exponentialRampToValueAtTime(50, now + 0.15);
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+      osc.start(now); osc.stop(now + 0.2);
+      break;
+    case 'sniper':
+      osc.type = 'sine'; osc.frequency.setValueAtTime(1200, now);
+      osc.frequency.exponentialRampToValueAtTime(80, now + 0.2);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.start(now); osc.stop(now + 0.25);
+      break;
+    case 'rocket':
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(100, now);
+      osc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc.start(now); osc.stop(now + 0.35);
+      break;
+    case 'explosion':
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(80, now);
+      osc.frequency.exponentialRampToValueAtTime(20, now + 0.4);
+      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      osc.start(now); osc.stop(now + 0.5);
+      break;
+    case 'hit':
+      osc.type = 'sine'; osc.frequency.setValueAtTime(300, now);
+      osc.frequency.exponentialRampToValueAtTime(100, now + 0.05);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+      osc.start(now); osc.stop(now + 0.06);
+      break;
+    case 'kill':
+      osc.type = 'sine'; osc.frequency.setValueAtTime(500, now);
+      osc.frequency.setValueAtTime(800, now + 0.05);
+      osc.frequency.setValueAtTime(600, now + 0.1);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.start(now); osc.stop(now + 0.15);
+      break;
+    case 'powerup':
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(400, now);
+      osc.frequency.setValueAtTime(600, now + 0.1);
+      osc.frequency.setValueAtTime(800, now + 0.2);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      osc.start(now); osc.stop(now + 0.3);
+      break;
+    case 'damage':
+      osc.type = 'square'; osc.frequency.setValueAtTime(150, now);
+      osc.frequency.exponentialRampToValueAtTime(50, now + 0.15);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+      osc.start(now); osc.stop(now + 0.2);
+      break;
+    case 'dash':
+      osc.type = 'sine'; osc.frequency.setValueAtTime(200, now);
+      osc.frequency.exponentialRampToValueAtTime(1000, now + 0.1);
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      osc.start(now); osc.stop(now + 0.12);
+      break;
+    case 'laststand':
+      osc.type = 'sine'; osc.frequency.setValueAtTime(300, now);
+      osc.frequency.setValueAtTime(600, now + 0.15);
+      osc.frequency.setValueAtTime(900, now + 0.3);
+      osc.frequency.setValueAtTime(1200, now + 0.45);
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      osc.start(now); osc.stop(now + 0.5);
+      break;
+  }
+}
+
+// ====================== GAME FUNCTIONS ======================
+const camera = { x: 0, y: 0 };
+
+function worldToScreen(wx, wy) {
+  return { x: wx - camera.x + canvas.width / 2, y: wy - camera.y + canvas.height / 2 };
+}
+
+function screenToWorld(sx, sy) {
+  return { x: sx + camera.x - canvas.width / 2, y: sy + camera.y - canvas.height / 2 };
+}
+
+function dist(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+// Skill helpers
+function getSkill(name) { return saveData.skills[name] || 0; }
+
+function shoot() {
+  const w = weapons[player.weapon];
+  if (player.shootCooldown > 0) return;
+  if (w.ammo <= 0 && player.weapon !== 0) return;
+
+  player.shootCooldown = w.fireRate;
+  if (player.weapon !== 0) w.ammo--;
+
+  const world = screenToWorld(mouseX, mouseY);
+  const baseAngle = Math.atan2(world.y - player.y, world.x - player.x);
+
+  const marksmanMult = 1 + getSkill('marksman') * 0.08;
+  const critChance = getSkill('critStrike') * 0.06;
+
+  for (let i = 0; i < w.projectiles; i++) {
+    const angle = baseAngle + (Math.random() - 0.5) * w.spread * 2;
+    let dmgMult = player.damageBoost > 0 ? 2 : 1;
+    dmgMult *= marksmanMult;
+    let isCrit = false;
+    if (Math.random() < critChance) { dmgMult *= 1.8; isCrit = true; }
+
+    bullets.push({
+      x: player.x + Math.cos(baseAngle) * 25,
+      y: player.y + Math.sin(baseAngle) * 25,
+      vx: Math.cos(angle) * w.speed,
+      vy: Math.sin(angle) * w.speed,
+      damage: w.damage * dmgMult,
+      color: isCrit ? '#fff' : w.color,
+      size: isCrit ? w.size + 2 : w.size,
+      piercing: w.piercing,
+      explosive: w.explosive,
+      life: 120,
+      trail: [],
+      isCrit
+    });
+  }
+
+  playSound(w.sound);
+  shakeTimer = 3;
+  shakeIntensity = w === weapons[4] ? 8 : w === weapons[2] ? 5 : 2;
+  updateAmmoUI();
+}
+
+function throwGrenade() {
+  if (player.grenades <= 0) return;
+  player.grenades--;
+  const world = screenToWorld(mouseX, mouseY);
+  const angle = Math.atan2(world.y - player.y, world.x - player.x);
+  grenadeProjectiles.push({
+    x: player.x, y: player.y,
+    vx: Math.cos(angle) * 8,
+    vy: Math.sin(angle) * 8,
+    timer: 60,
+    radius: 120
+  });
+}
+
+function attemptDash() {
+  if (player.dashCooldown > 0 || player.isDashing) return;
+  player.isDashing = true;
+  player.dashTimer = 10;
+  const dashCdReduction = getSkill('quickDash') * 12;
+  player.dashCooldown = Math.max(20, 90 - dashCdReduction);
+  player.invincible = 10;
+
+  let dx = 0, dy = 0;
+  if (keys['w']) dy = -1;
+  if (keys['s']) dy = 1;
+  if (keys['a']) dx = -1;
+  if (keys['d']) dx = 1;
+  if (dx === 0 && dy === 0) {
+    dx = Math.cos(player.angle);
+    dy = Math.sin(player.angle);
+  }
+  const len = Math.hypot(dx, dy);
+  player.dashAngle = Math.atan2(dy / len, dx / len);
+  playSound('dash');
+}
+
+function createExplosion(x, y, radius, damage) {
+  playSound('explosion');
+  shakeTimer = 10;
+  shakeIntensity = 12;
+
+  for (let i = 0; i < 40; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 6 + 2;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 40 + Math.random() * 30,
+      maxLife: 70,
+      color: `hsl(${Math.random() * 40 + 10}, 100%, ${Math.random() * 40 + 50}%)`,
+      size: Math.random() * 6 + 3
+    });
+  }
+
+  enemies.forEach(e => {
+    if (dist(e, { x, y }) < radius) {
+      e.hp -= damage;
+      spawnDamageNumber(e.x, e.y, damage);
+    }
+  });
+}
+
+function spawnEnemy() {
+  const angle = Math.random() * Math.PI * 2;
+  const distance = 600 + Math.random() * 400;
+  const types = ['basic', 'fast', 'tank', 'shooter', 'bomber'];
+  const waveTypes = wave < 3 ? ['basic', 'fast'] :
+                    wave < 5 ? ['basic', 'fast', 'tank'] :
+                    wave < 8 ? ['basic', 'fast', 'tank', 'shooter'] : types;
+  const type = waveTypes[Math.floor(Math.random() * waveTypes.length)];
+
+  const baseStats = {
+    basic:   { hp: 50, speed: 1.8, radius: 16, color: '#ff4444', score: 100, damage: 10 },
+    fast:    { hp: 30, speed: 3.5, radius: 12, color: '#ffaa00', score: 150, damage: 8 },
+    tank:    { hp: 200, speed: 1.0, radius: 25, color: '#8844ff', score: 300, damage: 20 },
+    shooter: { hp: 60, speed: 1.5, radius: 15, color: '#00aaff', score: 250, damage: 5 },
+    bomber:  { hp: 80, speed: 2.2, radius: 18, color: '#ff00aa', score: 200, damage: 40 }
+  };
+
+  const s = baseStats[type];
+  const diff = currentDifficulty;
+  const scaledHp = (s.hp + wave * 10) * diff.enemyHpMult;
+  enemies.push({
+    x: player.x + Math.cos(angle) * distance,
+    y: player.y + Math.sin(angle) * distance,
+    hp: scaledHp, maxHp: scaledHp,
+    speed: (s.speed + wave * 0.05) * diff.enemySpdMult,
+    radius: s.radius,
+    color: s.color,
+    type, score: s.score,
+    damage: Math.round(s.damage * diff.dmgMult),
+    shootTimer: type === 'shooter' ? 60 : 0,
+    angle: 0,
+    hitFlash: 0
+  });
+}
+
+function spawnPowerup(x, y) {
+  const types = ['health', 'smg_ammo', 'shotgun_ammo', 'sniper_ammo', 'rocket_ammo', 'speed', 'damage', 'grenade'];
+  const type = types[Math.floor(Math.random() * types.length)];
+  const colors = {
+    health: '#00ff44', smg_ammo: '#00ffcc', shotgun_ammo: '#ff8800',
+    sniper_ammo: '#ff00ff', rocket_ammo: '#ff0040', speed: '#00ccff',
+    damage: '#ffcc00', grenade: '#ff6600'
+  };
+  const labels = {
+    health: '+HP', smg_ammo: '+SMG', shotgun_ammo: '+SG',
+    sniper_ammo: '+SR', rocket_ammo: '+RL', speed: 'SPD',
+    damage: 'DMG', grenade: '+G'
+  };
+  powerups.push({ x, y, type, color: colors[type], label: labels[type], life: 600, radius: 14, bobTimer: 0 });
+}
+
+function spawnDamageNumber(x, y, amount) {
+  damageNumbers.push({
+    x: x + (Math.random() - 0.5) * 20,
+    y: y - 20,
+    amount: Math.round(amount),
+    life: 40,
+    vy: -2,
+    color: amount >= 100 ? '#ff00ff' : amount >= 50 ? '#ffcc00' : '#fff'
+  });
+}
+
+function addKillFeed(enemyType) {
+  const feed = document.getElementById('kill-feed');
+  const entry = document.createElement('div');
+  entry.className = 'kill-entry';
+  entry.textContent = `☠ ${enemyType.toUpperCase()} ELIMINATED`;
+  feed.prepend(entry);
+  if (feed.children.length > 5) feed.lastChild.remove();
+  setTimeout(() => { entry.style.opacity = '0'; setTimeout(() => entry.remove(), 500); }, 2000);
+}
+
+// ====================== WAVE SYSTEM ======================
+let enemiesPerWave = 8;
+let enemiesSpawned = 0;
+let spawnTimer = 0;
+let waveComplete = false;
+let wavePauseTimer = 0;
+
+function startWave() {
+  enemiesPerWave = Math.floor((6 + wave * 4) * currentDifficulty.spawnMult);
+  enemiesSpawned = 0;
+  spawnTimer = 0;
+  waveComplete = false;
+
+  const announce = document.getElementById('wave-announce');
+  announce.textContent = `WAVE ${wave}`;
+  announce.style.opacity = '1';
+  setTimeout(() => { announce.style.opacity = '0'; }, 2000);
+}
+
+// ====================== UPDATE ======================
+function update() {
+  if (!gameRunning) return;
+
+  // Player movement (with agility skill)
+  let dx = 0, dy = 0;
+  const agilityBonus = getSkill('agility') * 0.5;
+  const baseSpd = player.speed + agilityBonus;
+  const spd = player.speedBoost > 0 ? baseSpd * 1.6 : baseSpd;
+  if (keys['w']) dy = -spd;
+  if (keys['s']) dy = spd;
+  if (keys['a']) dx = -spd;
+  if (keys['d']) dx = spd;
+  if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
+
+  if (player.isDashing) {
+    player.dashTimer--;
+    const windrunnerMult = 1 + getSkill('windrunner') * 0.15;
+    const dashSpeed = 15 * windrunnerMult;
+    player.x += Math.cos(player.dashAngle) * dashSpeed;
+    player.y += Math.sin(player.dashAngle) * dashSpeed;
+    for (let i = 0; i < 3; i++) {
+      particles.push({
+        x: player.x + (Math.random()-0.5)*15, y: player.y + (Math.random()-0.5)*15,
+        vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2,
+        life: 15, maxLife: 15, color: '#00ffcc', size: 5
+      });
+    }
+    if (player.dashTimer <= 0) player.isDashing = false;
+  } else {
+    player.x += dx;
+    player.y += dy;
+  }
+
+  player.x = Math.max(player.radius, Math.min(WORLD_SIZE - player.radius, player.x));
+  player.y = Math.max(player.radius, Math.min(WORLD_SIZE - player.radius, player.y));
+
+  const w = screenToWorld(mouseX, mouseY);
+  player.angle = Math.atan2(w.y - player.y, w.x - player.x);
+
+  camera.x += (player.x - camera.x) * 0.1;
+  camera.y += (player.y - camera.y) * 0.1;
+
+  if (player.shootCooldown > 0) player.shootCooldown--;
+  if (player.dashCooldown > 0) player.dashCooldown--;
+  if (player.invincible > 0) player.invincible--;
+  if (player.speedBoost > 0) player.speedBoost--;
+  if (player.damageBoost > 0) player.damageBoost--;
+
+  if (mouseDown) shoot();
+
+  if (comboTimer > 0) {
+    comboTimer--;
+    if (comboTimer <= 0) combo = 0;
+  }
+
+  if (shakeTimer > 0) shakeTimer--;
+
+  // ---- WAVE SPAWNING ----
+  if (!waveComplete) {
+    spawnTimer--;
+    if (spawnTimer <= 0 && enemiesSpawned < enemiesPerWave) {
+      spawnEnemy();
+      enemiesSpawned++;
+      spawnTimer = Math.max(10, 40 - wave * 2);
+    }
+    if (enemiesSpawned >= enemiesPerWave && enemies.length === 0) {
+      waveComplete = true;
+      wavePauseTimer = 120;
+    }
+  } else {
+    wavePauseTimer--;
+    if (wavePauseTimer <= 0) {
+      wave++;
+      const grenadeCap = 3 + getSkill('demolition');
+      if (wave % 3 === 0) player.grenades = Math.min(player.grenades + 2, grenadeCap + 7);
+      startWave();
+    }
+  }
+
+  // ---- UPDATE BULLETS ----
+  const scavengerBonus = getSkill('scavenger') * 0.10;
+  const powerupBaseChance = 0.3 + scavengerBonus;
+
+  bullets = bullets.filter(b => {
+    b.x += b.vx; b.y += b.vy;
+    b.life--;
+
+    b.trail.push({ x: b.x, y: b.y, life: 10 });
+    b.trail = b.trail.filter(t => { t.life--; return t.life > 0; });
+
+    let hit = false;
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      if (dist(b, e) < e.radius + b.size) {
+        e.hp -= b.damage;
+        e.hitFlash = 6;
+        spawnDamageNumber(e.x, e.y, b.damage);
+        playSound('hit');
+
+        if (b.explosive) {
+          createExplosion(b.x, b.y, 100, b.damage * 0.6);
+        }
+
+        if (e.hp <= 0) {
+          const comboMult = Math.max(1, combo);
+          score += e.score * comboMult;
+          combo++;
+          comboTimer = 120;
+          playSound('kill');
+          addKillFeed(e.type);
+
+          for (let p = 0; p < 15; p++) {
+            const a = Math.random() * Math.PI * 2;
+            const s = Math.random() * 4 + 1;
+            particles.push({
+              x: e.x, y: e.y,
+              vx: Math.cos(a)*s, vy: Math.sin(a)*s,
+              life: 30 + Math.random()*20, maxLife: 50,
+              color: e.color, size: Math.random()*5+2
+            });
+          }
+
+          if (Math.random() < powerupBaseChance) spawnPowerup(e.x, e.y);
+
+          enemies.splice(i, 1);
+        }
+
+        if (!b.piercing) { hit = true; break; }
+      }
+    }
+
+    return !hit && b.life > 0 && b.x > 0 && b.x < WORLD_SIZE && b.y > 0 && b.y < WORLD_SIZE;
+  });
+
+  // ---- UPDATE ENEMIES ----
+  const armorReduction = 1 - getSkill('armor') * 0.08;
+
+  enemies.forEach(e => {
+    const angle = Math.atan2(player.y - e.y, player.x - e.x);
+    e.angle = angle;
+
+    if (e.type === 'shooter') {
+      const d = dist(e, player);
+      if (d > 250) {
+        e.x += Math.cos(angle) * e.speed;
+        e.y += Math.sin(angle) * e.speed;
+      } else if (d < 180) {
+        e.x -= Math.cos(angle) * e.speed * 0.5;
+        e.y -= Math.sin(angle) * e.speed * 0.5;
+      }
+      e.shootTimer--;
+      if (e.shootTimer <= 0) {
+        e.shootTimer = 80;
+        bullets.push({
+          x: e.x, y: e.y,
+          vx: Math.cos(angle) * 6,
+          vy: Math.sin(angle) * 6,
+          damage: -e.damage,
+          color: '#ff0000', size: 4,
+          piercing: false, explosive: false,
+          life: 120, trail: [], isEnemy: true
+        });
+      }
+    } else {
+      e.x += Math.cos(angle) * e.speed;
+      e.y += Math.sin(angle) * e.speed;
+    }
+
+    if (e.hitFlash > 0) e.hitFlash--;
+
+    if (dist(e, player) < e.radius + player.radius && player.invincible <= 0) {
+      const dmg = e.damage * armorReduction;
+      player.hp -= dmg;
+      player.invincible = 30;
+      shakeTimer = 8; shakeIntensity = 6;
+      playSound('damage');
+      document.getElementById('damage-flash').style.opacity = '0.6';
+      setTimeout(() => document.getElementById('damage-flash').style.opacity = '0', 150);
+
+      if (e.type === 'bomber') {
+        createExplosion(e.x, e.y, 80, 30);
+        e.hp = 0;
+      }
+    }
+  });
+
+  enemies = enemies.filter(e => {
+    if (e.hp <= 0) {
+      score += e.score;
+      for (let p = 0; p < 10; p++) {
+        const a = Math.random() * Math.PI * 2;
+        particles.push({ x: e.x, y: e.y, vx: Math.cos(a)*3, vy: Math.sin(a)*3, life: 25, maxLife: 25, color: e.color, size: 3 });
+      }
+      if (Math.random() < 0.2 + scavengerBonus) spawnPowerup(e.x, e.y);
+      return false;
+    }
+    return true;
+  });
+
+  // Enemy bullets hitting player
+  bullets = bullets.filter(b => {
+    if (b.isEnemy && dist(b, player) < player.radius + b.size && player.invincible <= 0) {
+      const dmg = Math.abs(b.damage) * armorReduction;
+      player.hp -= dmg;
+      player.invincible = 20;
+      playSound('damage');
+      document.getElementById('damage-flash').style.opacity = '0.4';
+      setTimeout(() => document.getElementById('damage-flash').style.opacity = '0', 150);
+      return false;
+    }
+    return true;
+  });
+
+  // ---- GRENADES ----
+  grenadeProjectiles = grenadeProjectiles.filter(g => {
+    g.x += g.vx; g.y += g.vy;
+    g.vx *= 0.96; g.vy *= 0.96;
+    g.timer--;
+    if (g.timer <= 0) {
+      createExplosion(g.x, g.y, g.radius, 100 + wave * 5);
+      return false;
+    }
+    return true;
+  });
+
+  // ---- POWERUPS ----
+  powerups = powerups.filter(p => {
+    p.life--;
+    p.bobTimer += 0.05;
+    if (dist(p, player) < p.radius + player.radius + 20) {
+      playSound('powerup');
+      const notify = document.getElementById('powerup-notify');
+      switch (p.type) {
+        case 'health': player.hp = Math.min(player.maxHp, player.hp + 30); notify.style.color = p.color; notify.textContent = '+30 HP'; break;
+        case 'smg_ammo': weapons[1].ammo = Math.min(weapons[1].maxAmmo, weapons[1].ammo + 60); notify.style.color = p.color; notify.textContent = '+60 SMG AMMO'; break;
+        case 'shotgun_ammo': weapons[2].ammo = Math.min(weapons[2].maxAmmo, weapons[2].ammo + 12); notify.style.color = p.color; notify.textContent = '+12 SHOTGUN AMMO'; break;
+        case 'sniper_ammo': weapons[3].ammo = Math.min(weapons[3].maxAmmo, weapons[3].ammo + 8); notify.style.color = p.color; notify.textContent = '+8 SNIPER AMMO'; break;
+        case 'rocket_ammo': weapons[4].ammo = Math.min(weapons[4].maxAmmo, weapons[4].ammo + 5); notify.style.color = p.color; notify.textContent = '+5 ROCKETS'; break;
+        case 'speed': player.speedBoost = 300; notify.style.color = p.color; notify.textContent = 'SPEED BOOST!'; break;
+        case 'damage': player.damageBoost = 300; notify.style.color = p.color; notify.textContent = 'DAMAGE x2!'; break;
+        case 'grenade': player.grenades = Math.min(10, player.grenades + 2); notify.style.color = p.color; notify.textContent = '+2 GRENADES'; break;
+      }
+      notify.style.opacity = '1';
+      setTimeout(() => notify.style.opacity = '0', 1500);
+      updateAmmoUI();
+      return false;
+    }
+    return p.life > 0;
+  });
+
+  // ---- PARTICLES ----
+  particles = particles.filter(p => {
+    p.x += p.vx; p.y += p.vy;
+    p.vx *= 0.96; p.vy *= 0.96;
+    p.life--;
+    return p.life > 0;
+  });
+
+  // ---- DAMAGE NUMBERS ----
+  damageNumbers = damageNumbers.filter(d => {
+    d.y += d.vy;
+    d.life--;
+    return d.life > 0;
+  });
+
+  // ---- UI UPDATE ----
+  document.getElementById('score-display').textContent = score.toLocaleString();
+  document.getElementById('wave-display').textContent = wave;
+  document.getElementById('combo-display').textContent = combo > 1 ? `x${combo}` : 'x1';
+  document.getElementById('enemies-display').textContent = enemies.length;
+  document.getElementById('health-bar').style.width = `${Math.max(0, player.hp / player.maxHp * 100)}%`;
+  document.getElementById('health-text').textContent = `HP ${Math.max(0, Math.round(player.hp))}/${player.maxHp}`;
+
+  const hpPct = player.hp / player.maxHp;
+  const hbar = document.getElementById('health-bar');
+  if (hpPct > 0.5) hbar.style.background = 'linear-gradient(90deg, #00cc44, #44ff66)';
+  else if (hpPct > 0.25) hbar.style.background = 'linear-gradient(90deg, #ffaa00, #ffcc00)';
+  else hbar.style.background = 'linear-gradient(90deg, #ff0040, #ff4444)';
+
+  // ---- LAST STAND ----
+  if (player.hp <= 0 && !lastStandUsed && getSkill('lastStand') >= 1) {
+    lastStandUsed = true;
+    player.hp = 30;
+    player.invincible = 90;
+    playSound('laststand');
+    shakeTimer = 15; shakeIntensity = 10;
+    document.getElementById('damage-flash').style.opacity = '0';
+    const notify = document.getElementById('powerup-notify');
+    notify.style.color = '#ff4400';
+    notify.textContent = '🔥 LAST STAND! 🔥';
+    notify.style.opacity = '1';
+    setTimeout(() => notify.style.opacity = '0', 2000);
+    // Big flash
+    for (let i = 0; i < 30; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = Math.random() * 5 + 2;
+      particles.push({
+        x: player.x, y: player.y,
+        vx: Math.cos(a)*s, vy: Math.sin(a)*s,
+        life: 30, maxLife: 30,
+        color: `hsl(${Math.random()*30+10}, 100%, 60%)`, size: 4
+      });
+    }
+  }
+
+  // Game over
+  if (player.hp <= 0) {
+    gameRunning = false;
+    endGame();
+  }
+}
+
+// ====================== END GAME — REWARDS ======================
+function endGame() {
+  const diff = currentDifficulty;
+  const rewardMult = diff.rewardMult;
+
+  // Calculate rewards
+  const creditsEarned = Math.floor(score * 0.01 * rewardMult);
+  const tokensEarned = Math.floor(wave / 5);
+
+  // Chests earned
+  const chestsEarned = [];
+  if (wave >= 2) chestsEarned.push('bronze');
+  if (wave >= 5) chestsEarned.push('silver');
+  if (wave >= 10) chestsEarned.push('gold');
+  if (wave >= 15) chestsEarned.push('legendary');
+
+  // Apply rewards
+  saveData.credits += creditsEarned;
+  saveData.tokens += tokensEarned;
+  chestsEarned.forEach(c => { saveData.chestsOwned[c] = (saveData.chestsOwned[c] || 0) + 1; });
+  saveData.totalGamesPlayed++;
+  if (score > saveData.bestScore) saveData.bestScore = score;
+  if (wave > saveData.bestWave) saveData.bestWave = wave;
+  writeSave();
+
+  // Show game over
+  document.getElementById('game-over-screen').style.display = 'flex';
+  document.getElementById('final-score').textContent = `SCORE: ${score.toLocaleString()}`;
+  document.getElementById('final-wave').textContent = `REACHED WAVE ${wave}`;
+
+  const rewardsDiv = document.getElementById('go-rewards');
+  rewardsDiv.innerHTML = '';
+
+  const addReward = (icon, text) => {
+    const el = document.createElement('div');
+    el.className = 'go-reward';
+    el.innerHTML = `<div class="go-r-icon">${icon}</div><div class="go-r-text">${text}</div>`;
+    rewardsDiv.appendChild(el);
+  };
+
+  addReward('💰', `+${creditsEarned} Credits`);
+  if (tokensEarned > 0) addReward('🔮', `+${tokensEarned} Tokens`);
+  chestsEarned.forEach(c => addReward(CHEST_DEFS[c].icon, `+1 ${CHEST_DEFS[c].name}`));
+}
+
+// ====================== RENDER ======================
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  let sx = 0, sy = 0;
+  if (shakeTimer > 0) {
+    sx = (Math.random() - 0.5) * shakeIntensity;
+    sy = (Math.random() - 0.5) * shakeIntensity;
+  }
+
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  const cx = camera.x - canvas.width / 2;
+  const cy = camera.y - canvas.height / 2;
+
+  // Background - grid
+  ctx.strokeStyle = '#111133';
+  ctx.lineWidth = 1;
+  const gridSize = 80;
+  const startX = -((cx % gridSize) + gridSize) % gridSize;
+  const startY = -((cy % gridSize) + gridSize) % gridSize;
+  for (let x = startX; x < canvas.width; x += gridSize) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (let y = startY; y < canvas.height; y += gridSize) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+
+  // Stars
+  stars.forEach(s => {
+    const sp = worldToScreen(s.x, s.y);
+    if (sp.x < -10 || sp.x > canvas.width+10 || sp.y < -10 || sp.y > canvas.height+10) return;
+    const twinkle = Math.sin(Date.now() * s.twinkleSpeed) * 0.3 + s.brightness;
+    ctx.globalAlpha = twinkle;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, s.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+
+  // World border
+  const tl = worldToScreen(0, 0);
+  const br = worldToScreen(WORLD_SIZE, WORLD_SIZE);
+  ctx.strokeStyle = '#ff004050';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([20, 10]);
+  ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  ctx.setLineDash([]);
+
+  // ---- POWERUPS ----
+  powerups.forEach(p => {
+    const sp = worldToScreen(p.x, p.y + Math.sin(p.bobTimer) * 5);
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, p.life / 60);
+    const grd = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, 30);
+    grd.addColorStop(0, p.color + '40');
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, 30, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, p.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 10px Orbitron';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(p.label, sp.x, sp.y);
+    ctx.restore();
+  });
+
+  // ---- PARTICLES ----
+  particles.forEach(p => {
+    const sp = worldToScreen(p.x, p.y);
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, p.size * (p.life / p.maxLife), 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+
+  // ---- BULLET TRAILS + BULLETS ----
+  bullets.forEach(b => {
+    b.trail.forEach((t, i) => {
+      const sp = worldToScreen(t.x, t.y);
+      ctx.globalAlpha = t.life / 10 * 0.5;
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, b.size * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+
+    const sp = worldToScreen(b.x, b.y);
+    ctx.fillStyle = b.color;
+    ctx.shadowColor = b.color;
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, b.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  });
+
+  // ---- GRENADES ----
+  grenadeProjectiles.forEach(g => {
+    const sp = worldToScreen(g.x, g.y);
+    ctx.fillStyle = '#ff6600';
+    ctx.shadowColor = '#ff6600';
+    ctx.shadowBlur = 15;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = g.timer < 20 ? '#ff0000' : '#ff660080';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, 10, 0, Math.PI * 2 * (g.timer / 60));
+    ctx.stroke();
+  });
+
+  // ---- ENEMIES ----
+  enemies.forEach(e => {
+    const sp = worldToScreen(e.x, e.y);
+    if (sp.x < -50 || sp.x > canvas.width+50 || sp.y < -50 || sp.y > canvas.height+50) return;
+
+    ctx.save();
+    ctx.translate(sp.x, sp.y);
+    ctx.rotate(e.angle);
+
+    ctx.shadowColor = e.hitFlash > 0 ? '#fff' : e.color;
+    ctx.shadowBlur = e.hitFlash > 0 ? 20 : 10;
+
+    ctx.fillStyle = e.hitFlash > 0 ? '#fff' : e.color;
+    ctx.beginPath();
+
+    if (e.type === 'tank') {
+      for (let i = 0; i < 6; i++) {
+        const a = (Math.PI / 3) * i - Math.PI / 6;
+        const px = Math.cos(a) * e.radius;
+        const py = Math.sin(a) * e.radius;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    } else if (e.type === 'bomber') {
+      ctx.moveTo(e.radius, 0);
+      ctx.lineTo(0, e.radius * 0.7);
+      ctx.lineTo(-e.radius, 0);
+      ctx.lineTo(0, -e.radius * 0.7);
+      ctx.closePath();
+    } else if (e.type === 'fast') {
+      ctx.moveTo(e.radius, 0);
+      ctx.lineTo(-e.radius * 0.8, e.radius * 0.7);
+      ctx.lineTo(-e.radius * 0.8, -e.radius * 0.7);
+      ctx.closePath();
+    } else {
+      ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
+    }
+    ctx.fill();
+
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(e.radius * 0.3, 0, e.radius * 0.25, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ff0000';
+    ctx.beginPath();
+    ctx.arc(e.radius * 0.35, 0, e.radius * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    if (e.hp < e.maxHp) {
+      const barW = e.radius * 2;
+      const barH = 4;
+      ctx.fillStyle = '#33333380';
+      ctx.fillRect(sp.x - barW/2, sp.y - e.radius - 12, barW, barH);
+      ctx.fillStyle = e.hp / e.maxHp > 0.5 ? '#00ff44' : e.hp / e.maxHp > 0.25 ? '#ffaa00' : '#ff0040';
+      ctx.fillRect(sp.x - barW/2, sp.y - e.radius - 12, barW * (e.hp / e.maxHp), barH);
+    }
+
+    ctx.fillStyle = '#ffffff60';
+    ctx.font = '8px Orbitron';
+    ctx.textAlign = 'center';
+    ctx.fillText(e.type.toUpperCase(), sp.x, sp.y + e.radius + 14);
+  });
+
+  // ---- PLAYER ----
+  const pp = worldToScreen(player.x, player.y);
+  ctx.save();
+  ctx.translate(pp.x, pp.y);
+  ctx.rotate(player.angle);
+
+  if (player.isDashing) {
+    ctx.shadowColor = '#00ffcc';
+    ctx.shadowBlur = 30;
+  }
+
+  if (player.speedBoost > 0) {
+    ctx.strokeStyle = '#00ccff40';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, player.radius + 8 + Math.sin(Date.now() * 0.01) * 3, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  if (player.damageBoost > 0) {
+    ctx.strokeStyle = '#ffcc0040';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, player.radius + 12 + Math.sin(Date.now() * 0.015) * 3, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = player.invincible > 0 && Math.floor(Date.now() / 50) % 2 ? '#ffffff80' : '#00ddff';
+  ctx.shadowColor = '#00ddff';
+  ctx.shadowBlur = 15;
+  ctx.beginPath();
+  ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#88ccff';
+  ctx.fillRect(player.radius - 2, -4, 18, 8);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(0, 0, 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  // ---- DAMAGE NUMBERS ----
+  damageNumbers.forEach(d => {
+    const sp = worldToScreen(d.x, d.y);
+    ctx.globalAlpha = d.life / 40;
+    ctx.fillStyle = d.color;
+    ctx.font = `bold ${d.amount >= 100 ? 18 : 14}px Orbitron`;
+    ctx.textAlign = 'center';
+    ctx.fillText(d.amount, sp.x, sp.y);
+  });
+  ctx.globalAlpha = 1;
+
+  ctx.restore(); // end shake
+
+  // ---- MINIMAP ----
+  renderMinimap();
+}
+
+function renderMinimap() {
+  const mc = minimapCtx;
+  const mw = 140, mh = 140;
+  mc.clearRect(0, 0, mw, mh);
+  mc.fillStyle = '#0a0a1a90';
+  mc.fillRect(0, 0, mw, mh);
+
+  const scale = mw / WORLD_SIZE;
+
+  mc.strokeStyle = '#333';
+  mc.lineWidth = 1;
+  mc.strokeRect(0, 0, mw, mh);
+
+  enemies.forEach(e => {
+    mc.fillStyle = e.color;
+    mc.beginPath();
+    mc.arc(e.x * scale, e.y * scale, 2, 0, Math.PI * 2);
+    mc.fill();
+  });
+
+  powerups.forEach(p => {
+    mc.fillStyle = p.color;
+    mc.fillRect(p.x * scale - 1.5, p.y * scale - 1.5, 3, 3);
+  });
+
+  mc.fillStyle = '#00ffcc';
+  mc.beginPath();
+  mc.arc(player.x * scale, player.y * scale, 3, 0, Math.PI * 2);
+  mc.fill();
+
+  mc.strokeStyle = '#ffffff30';
+  mc.lineWidth = 1;
+  mc.strokeRect(
+    (camera.x - canvas.width/2) * scale,
+    (camera.y - canvas.height/2) * scale,
+    canvas.width * scale,
+    canvas.height * scale
+  );
+}
+
+function updateWeaponUI() {
+  for (let i = 0; i < 5; i++) {
+    const el = document.getElementById(`weapon-${i}`);
+    el.classList.toggle('active', i === player.weapon);
+  }
+  updateAmmoUI();
+}
+
+function updateAmmoUI() {
+  for (let i = 1; i < 5; i++) {
+    document.getElementById(`ammo-${i}`).textContent = weapons[i].ammo;
+  }
+}
+
+// ====================== GAME LOOP ======================
+function gameLoop() {
+  update();
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+// ====================== START / RESTART ======================
+function initGame() {
+  // Apply weapon upgrades
+  weapons = getAppliedWeaponStats();
+
+  // Apply skill bonuses
+  const vitalityBonus = getSkill('vitality') * 20;
+  player.maxHp = 100 + vitalityBonus;
+
+  // Set difficulty
+  currentDifficulty = DIFFICULTIES[saveData.selectedDifficulty];
+  const diffDef = currentDifficulty;
+  const badge = document.getElementById('diff-badge');
+  badge.textContent = diffDef.label;
+  badge.style.color = diffDef.color;
+  badge.style.borderColor = diffDef.color + '80';
+  badge.style.background = 'rgba(0,0,0,0.6)';
+
+  player.x = WORLD_SIZE / 2;
+  player.y = WORLD_SIZE / 2;
+  player.hp = player.maxHp;
+  player.weapon = 0;
+  player.shootCooldown = 0;
+  player.dashCooldown = 0;
+  player.isDashing = false;
+  player.invincible = 0;
+  player.speedBoost = 0;
+  player.damageBoost = 0;
+  player.grenades = 3 + getSkill('demolition');
+
+  lastStandUsed = false;
+
+  score = 0;
+  wave = 1;
+  combo = 0;
+  comboTimer = 0;
+
+  bullets = [];
+  enemies = [];
+  particles = [];
+  powerups = [];
+  grenadeProjectiles = [];
+  damageNumbers = [];
+
+  weapons[1].ammo = 0;
+  weapons[2].ammo = 0;
+  weapons[3].ammo = 0;
+  weapons[4].ammo = 0;
+
+  updateWeaponUI();
+  gameRunning = true;
+  startWave();
+}
+
+// Return to hub from game over
+document.getElementById('restart-btn').addEventListener('click', () => {
+  document.getElementById('game-over-screen').style.display = 'none';
+  showHub();
+});
+
+// Start the loop, show hub
+gameLoop();
+showHub();
+
+// Remove old start screen if it exists
+const oldStart = document.getElementById('start-screen');
+if (oldStart) oldStart.remove();
+</script>
+</body>
+</html>
